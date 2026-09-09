@@ -1,0 +1,136 @@
+# Phase 5: runs the FastAPI app alongside lightweight simulated
+# containers for every service declared in config/services.yaml.
+#
+# Hostname resolution is handled entirely by Docker Compose network
+# aliases below (each simulated container is aliased to the exact
+# `host` value already in services.yaml, e.g. legacy-auth.internal) -
+# config/services.yaml and the application code are unmodified.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: docker
+      DATABASE_URL: sqlite:////data/app.db
+      # Passed through from the host shell that runs `docker compose up`
+      # (e.g. PowerShell: $env:SIMULATE_MIGRATION_FAILURES="payment-service")
+      # into the app container's environment, so the existing
+      # SimulatedMigrationProvider / SimulatedHealthChecker injection points
+      # (see README "Failure injection" section) can be driven without
+      # editing this file, code, or services.yaml. Unset on the host means
+      # empty here, matching the app's own no-simulated-failures default.
+      SIMULATE_MIGRATION_FAILURES: ${SIMULATE_MIGRATION_FAILURES:-}
+      SIMULATE_ROLLBACK_FAILURES: ${SIMULATE_ROLLBACK_FAILURES:-}
+      SIMULATE_HEALTH_CHECK_FAILURES: ${SIMULATE_HEALTH_CHECK_FAILURES:-}
+    volumes:
+      - app_db_data:/data
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      database-service:
+        condition: service_healthy
+      cache-service:
+        condition: service_healthy
+      message-queue:
+        condition: service_healthy
+      reporting-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    networks:
+      - infra-network
+
+  # --- Simulated services below ---------------------------------------
+  # All share the same dependency-free HTTP stub image (simulated_services/),
+  # parameterized per-container to match config/services.yaml's
+  # host/port/health_endpoint for that service.
+
+  auth-service:
+    build: ./simulated_services
+    environment:
+      SERVICE_NAME: auth-service
+      PORT: "8050"
+      HEALTH_PATH: /health
+    expose: ["8050"]
+    networks:
+      infra-network:
+        aliases: [legacy-auth.internal]
+
+  payment-service:
+    build: ./simulated_services
+    environment:
+      SERVICE_NAME: payment-service
+      PORT: "8080"
+      HEALTH_PATH: /health
+    expose: ["8080"]
+    networks:
+      infra-network:
+        aliases: [legacy-payment.internal]
+
+  database-service:
+    build: ./simulated_services
+    environment:
+      SERVICE_NAME: database-service
+      PORT: "5432"
+      HEALTH_PATH: /ready
+    expose: ["5432"]
+    networks:
+      infra-network:
+        aliases: [legacy-db.internal]
+
+  cache-service:
+    build: ./simulated_services
+    environment:
+      SERVICE_NAME: cache-service
+      PORT: "6379"
+      HEALTH_PATH: /ping
+    expose: ["6379"]
+    networks:
+      infra-network:
+        aliases: [legacy-cache.internal]
+
+  message-queue:
+    build: ./simulated_services
+    environment:
+      SERVICE_NAME: message-queue
+      PORT: "5672"
+      HEALTH_PATH: /health
+    expose: ["5672"]
+    networks:
+      infra-network:
+        aliases: [legacy-mq.internal]
+
+  reporting-service:
+    build: ./simulated_services
+    environment:
+      SERVICE_NAME: reporting-service
+      PORT: "9090"
+      HEALTH_PATH: /api/health
+    expose: ["9090"]
+    networks:
+      infra-network:
+        aliases: [legacy-reporting.internal]
+
+  notification-service:
+    build: ./simulated_services
+    environment:
+      SERVICE_NAME: notification-service
+      PORT: "8090"
+      HEALTH_PATH: /status/health
+    expose: ["8090"]
+    networks:
+      infra-network:
+        aliases: [legacy-notify.internal]
+
+networks:
+  infra-network:
+    driver: bridge
+
+volumes:
+  app_db_data:

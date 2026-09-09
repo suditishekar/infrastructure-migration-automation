@@ -1,0 +1,88 @@
+# Service Inventory Configuration
+# This YAML file defines all services managed by the infrastructure migration system.
+# Each service contains metadata for inventory, pre-migration validation, health checks, and orchestration.
+
+services:
+  payment-service:
+    id: payment-service
+    name: Payment Processing Service
+    host: legacy-payment.internal
+    port: 8080
+    source_environment: legacy
+    target_environment: modern
+    health_endpoint: /health
+    dependencies: [auth-service, database-service]
+    service_type: core
+    criticality: high
+
+  reporting-service:
+    id: reporting-service
+    name: Reporting & Analytics Service
+    host: legacy-reporting.internal
+    port: 9090
+    source_environment: legacy
+    target_environment: modern
+    health_endpoint: /api/health
+    dependencies: [database-service, cache-service]
+    service_type: analytics
+    criticality: medium
+
+  notification-service:
+    id: notification-service
+    name: Notification & Alert Service
+    host: legacy-notify.internal
+    port: 8090
+    source_environment: legacy
+    target_environment: modern
+    health_endpoint: /status/health
+    dependencies: [message-queue, auth-service]
+    service_type: utility
+    criticality: medium
+
+  auth-service:
+    id: auth-service
+    name: Authentication & Authorization Service
+    host: legacy-auth.internal
+    port: 8050
+    source_environment: legacy
+    target_environment: modern
+    health_endpoint: /health
+    dependencies: []
+    service_type: core
+    criticality: high
+
+  database-service:
+    id: database-service
+    name: Primary Database Service
+    host: legacy-db.internal
+    port: 5432
+    source_environment: legacy
+    target_environment: modern
+    health_endpoint: /ready
+    dependencies: []
+    service_type: infrastructure
+    criticality: critical
+
+  cache-service:
+    id: cache-service
+    name: Distributed Cache Service
+    host: legacy-cache.internal
+    port: 6379
+    source_environment: legacy
+    target_environment: modern
+    health_endpoint: /ping
+    dependencies: []
+    service_type: infrastructure
+    criticality: medium
+
+  message-queue:
+    id: message-queue
+    name: Message Queue Service
+    host: legacy-mq.internal
+    port: 5672
+    source_environment: legacy
+    target_environment: modern
+    health_endpoint: /health
+    dependencies: []
+    service_type: infrastructure
+    criticality: high
